@@ -9,6 +9,8 @@ import html
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
+import chromedriver_autoinstaller
+import shutil
 
 def remove_ads(main_container):
     # 광고 및 체크인 버튼 등 불필요 요소 제거
@@ -97,12 +99,21 @@ def clean_scripts(main_container):
         script.decompose()
 
 def extract_blog_html(url, options=None):
-    # Selenium 설정
+    chromedriver_autoinstaller.install()
     if options is None:
         options = Options()
         options.add_argument("--headless")
         options.add_argument("--disable-gpu")
         options.add_argument("--no-sandbox")
+    chromium_paths = [
+        "/usr/bin/chromium-browser",
+        "/usr/bin/chromium",
+        "/usr/bin/google-chrome",
+    ]
+    for path in chromium_paths:
+        if shutil.which(path):
+            options.binary_location = path
+            break
     driver = webdriver.Chrome(options=options)
     driver.get(url)
     wait_for_page_load(driver)
