@@ -138,10 +138,25 @@ st.info(
     "💡 **참고 URL**: `https://blog.naver.com/monkey_dream/223816008103`\n - **블로그 ID**: `monkey_dream`\n - **게시물 번호**: `223816008103`",
     icon="ℹ️")
 
-# 사용자 입력
-blog_id_input = st.text_input("블로그 ID (Blog ID)", placeholder="예: monkey_dream")
-post_num_input = st.text_input("게시물 번호 (Post Number)", placeholder="예: 223816008103")
+# 세션 상태 초기화
+if 'extraction_completed' not in st.session_state:
+    st.session_state.extraction_completed = False
+if 'extraction_data' not in st.session_state:
+    st.session_state.extraction_data = {}
+if 'download_completed' not in st.session_state:
+    st.session_state.download_completed = False
 
+# 사용자 입력 - 세션 상태에서 기본값 가져오기
+blog_id_input = st.text_input(
+    "블로그 ID (Blog ID)", 
+    value=st.session_state.extraction_data.get('blog_id', ''),
+    placeholder="예: monkey_dream"
+)
+post_num_input = st.text_input(
+    "게시물 번호 (Post Number)", 
+    value=st.session_state.extraction_data.get('post_num', ''),
+    placeholder="예: 223816008103"
+)
 
 if st.button("🚀 추출 시작!"):
     st.markdown("---")
@@ -150,22 +165,141 @@ if st.button("🚀 추출 시작!"):
             result_message = crawl_and_save_blog_post(blog_id_input, post_num_input)
 
         if "성공" in result_message:
-            st.success(result_message)
-            
-            # 원본 블로그 링크 생성 및 표시
-            original_url = f"https://blog.naver.com/{blog_id_input}/{post_num_input}"
-            st.info(f"🔗 **원본 블로그 링크**: [{original_url}]({original_url})")
-            
-            # 다운로드 버튼 제공 (선택 사항)
+            # 세션 상태에 결과 저장
             output_filename = f"crawled_{blog_id_input}_{post_num_input}.html"
             with open(output_filename, "r", encoding="utf-8") as f:
-                st.download_button(
-                    label=f"📄 {output_filename} 다운로드",
-                    data=f.read(),
-                    file_name=output_filename,
-                    mime='text/html'
-                )
+                html_content = f.read()
+            
+            st.session_state.extraction_completed = True
+            st.session_state.extraction_data = {
+                'blog_id': blog_id_input,
+                'post_num': post_num_input,
+                'html_content': html_content,
+                'output_filename': output_filename,
+                'original_url': f"https://blog.naver.com/{blog_id_input}/{post_num_input}",
+                'result_message': result_message
+            }
+            st.session_state.download_completed = False
+            
+            st.success(result_message)
         else:
             st.error(result_message)
+            st.session_state.extraction_completed = False
     else:
         st.warning("블로그 ID와 게시물 번호를 모두 입력해주세요.")
+        st.session_state.extraction_completed = False
+
+# 추출 완료된 경우 결과 표시
+if st.session_state.extraction_completed:
+    st.markdown("---")
+    
+    data = st.session_state.extraction_data
+    
+    # 다운로드 완료 메시지 표시
+    if st.session_state.download_completed:
+        st.success("✅ 다운로드가 완료되었습니다!")
+    
+    # 원본 블로그 링크 표시
+    st.info(f"🔗 **원본 블로그 링크**: [{data['original_url']}]({data['original_url']})")
+    
+    # HTML 미리보기 및 복사 기능
+    col1, col2 = st.columns(2)
+    
+    with col1:
+        # 다운로드 버튼 클릭 시 세션 상태 업데이트
+        if st.download_button(
+            label=f"📄 {data['output_filename']} 다운로드",
+            data=data['html_content'],
+            file_name=data['output_filename'],
+            mime='text/html',
+            key="download_btn"
+        ):
+            st.session_state.download_completed = True
+            st.rerun()  # 페이지 새로고침하여 다운로드 완료 메시지 표시
+    
+    with col2:
+        # JavaScript 기반 클립보드 복사 기능
+        copy_button_html = f"""
+        <style>
+        .copy-button {{
+            background-color: #ff4b4b;
+            color: white;
+            border: none;
+            padding: 0.5rem 1rem;
+            border-radius: 0.5rem;
+            cursor: pointer;
+            font-size: 14px;
+            margin: 10px 0;
+        }}
+        .copy-button:hover {{
+            background-color: #ff6b6b;
+        }}
+        #html-content {{
+            position: absolute;
+            left: -9999px;
+        }}
+        </style>
+        <textarea id="html-content" readonly>{data['html_content']}</textarea>
+        <button class="copy-button" onclick="copyToClipboard()">📋 HTML 클립보드에 복사</button>
+        <div id="copy-message" style="color: green; font-size: 12px; margin-top: 5px;"></div>
+        
+        <script>
+        function copyToClipboard() {{
+            const textArea = document.getElementById('html-content');
+            textArea.select();
+            textArea.setSelectionRange(0, 99999);
+            
+            try {{
+                document.execCommand('copy');
+                document.getElementById('copy-message').innerHTML = '✅ HTML이 클립보드에 복사되었습니다!';
+                setTimeout(() => {{
+                    document.getElementById('copy-message').innerHTML = '';
+                }}, 3000);
+            }} catch (err) {{
+                navigator.clipboard.writeText(textArea.value).then(() => {{
+                    document.getElementById('copy-message').innerHTML = '✅ HTML이 클립보드에 복사되었습니다!';
+                    setTimeout(() => {{
+                        document.getElementById('copy-message').innerHTML = '';
+                    }}, 3000);
+                }}).catch(() => {{
+                    document.getElementById('copy-message').innerHTML = '❌ 복사 실패. 수동으로 복사해주세요.';
+                }});
+            }}
+        }}
+        </script>
+        """
+        st.components.v1.html(copy_button_html, height=100)
+    
+    # HTML 실제 렌더링 미리보기
+    if st.checkbox("🔍 HTML 미리보기", key="html_preview_checkbox"):
+        st.subheader("📄 추출된 블로그 내용 미리보기")
+        
+        # HTML 내용에서 body 부분만 추출하여 표시 (흰색 배경 적용)
+        try:
+            from bs4 import BeautifulSoup
+            soup = BeautifulSoup(data['html_content'], 'html.parser')
+            body_content = soup.body
+            if body_content:
+                # body 내용을 흰색 배경 div로 감싸기
+                preview_html = f"""
+                <div style="background-color: white; padding: 20px; min-height: 100%; margin: 0;">
+                    {str(body_content)}
+                </div>
+                """
+                st.components.v1.html(preview_html, height=600, scrolling=True)
+            else:
+                # body가 없으면 전체 HTML을 흰색 배경 div로 감싸기
+                preview_html = f"""
+                <div style="background-color: white; padding: 20px; min-height: 100%; margin: 0;">
+                    {data['html_content']}
+                </div>
+                """
+                st.components.v1.html(preview_html, height=600, scrolling=True)
+        except:
+            # 파싱 실패 시 전체 HTML을 흰색 배경 div로 감싸기
+            preview_html = f"""
+            <div style="background-color: white; padding: 20px; min-height: 100%; margin: 0;">
+                {data['html_content']}
+            </div>
+            """
+            st.components.v1.html(preview_html, height=600, scrolling=True)
