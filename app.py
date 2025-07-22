@@ -119,6 +119,18 @@ def crawl_and_save_blog_post(blog_id: str, post_num: str) -> str:
 # --- Streamlit UI 부분 ---
 st.set_page_config(page_title="Naver Blog Crawler", page_icon="📝")
 
+# Streamlit 메뉴 및 툴바 숨기기 (프로덕션 환경용)
+hide_streamlit_style = """
+<style>
+#MainMenu {visibility: hidden;}
+.stDeployButton {display:none;}
+footer {visibility: hidden;}
+#stDecoration {display:none;}
+header {visibility: hidden;}
+</style>
+"""
+st.markdown(hide_streamlit_style, unsafe_allow_html=True)
+
 st.title("📝 네이버 블로그 크롤러")
 st.markdown("블로그 ID와 게시물 번호를 입력하면, 해당 포스트의 HTML과 CSS를 합쳐 단일 파일로 저장합니다.")
 
@@ -131,7 +143,7 @@ blog_id_input = st.text_input("블로그 ID (Blog ID)", placeholder="예: monkey
 post_num_input = st.text_input("게시물 번호 (Post Number)", placeholder="예: 223816008103")
 
 
-if st.button("🚀 크롤링 시작!"):
+if st.button("🚀 추출 시작!"):
     st.markdown("---")
     if blog_id_input and post_num_input:
         with st.spinner("블로그 포스트를 크롤링하고 있습니다... 잠시만 기다려주세요."):
