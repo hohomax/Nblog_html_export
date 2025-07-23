@@ -43,6 +43,10 @@ def crawl_and_save_blog_post(blog_id: str, post_num: str) -> str:
     # 4. 불필요한 요소들 제거
     for unwanted in soup.find_all(class_=['blog_fe_feed', 'section_t1']):
         unwanted.decompose()
+
+    # 지도 관련 영역 제거 (네이버 블로그에서만 동작하는 기능)
+    for map_element in soup.find_all(class_=['se-placesMap', 'se-section-placesMap', 'se-module-map-text']):
+        map_element.decompose()
     
     # 5. 이미지 품질 개선 및 스타일 적용
     # 이미지 URL만 고해상도로 변경하고, 레이아웃과 크기는 원본 그대로 보존
