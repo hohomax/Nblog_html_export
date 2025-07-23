@@ -2,6 +2,7 @@ import streamlit as st
 import requests
 from bs4 import BeautifulSoup
 from urllib.parse import urljoin
+import re
 
 
 def crawl_and_save_blog_post(blog_id: str, post_num: str) -> str:
@@ -44,22 +45,23 @@ def crawl_and_save_blog_post(blog_id: str, post_num: str) -> str:
         unwanted.decompose()
     
     # 5. 이미지 품질 개선 및 스타일 적용
-    # 모든 이미지의 src를 고해상도로 변경하고 필요한 스타일 추가
+    # 이미지 URL만 고해상도로 변경하고, 레이아웃과 크기는 원본 그대로 보존
     for img in soup.find_all('img', class_='se-image-resource'):
-        # 저해상도 블러 이미지를 고해상도로 변경
+        # 고해상도 이미지 URL로 변경 (원본 크기 보존)
         if img.get('src') and 'type=w80_blur' in img['src']:
-            img['src'] = img['src'].replace('type=w80_blur', 'type=w800')
+            img['src'] = img['src'].replace('type=w80_blur', 'type=w966')
+        elif img.get('src') and 'type=w' in img['src']:
+            # 다른 저해상도 패턴들도 고해상도로 변경 (w966은 네이버에서 지원하는 고해상도)
+            img['src'] = re.sub(r'type=w\d+', 'type=w966', img['src'])
         
-        # data-lazy-src가 있으면 src로 설정
+        # data-lazy-src가 있으면 고해상도로 변경
         if img.get('data-lazy-src'):
-            img['src'] = img['data-lazy-src']
-            
-        # 이미지에 기본 스타일 적용
-        img['style'] = 'display: block !important; margin-left: auto !important; margin-right: auto !important; max-width: 100% !important; height: auto !important;'
-    
-    # 이미지 링크에도 스타일 적용
-    for link in soup.find_all('a', class_='se-module-image-link'):
-        link['style'] = 'display: block !important; text-align: center !important; margin-left: auto !important; margin-right: auto !important; width: fit-content !important;'
+            lazy_src = img['data-lazy-src']
+            if 'type=w80_blur' in lazy_src:
+                lazy_src = lazy_src.replace('type=w80_blur', 'type=w966')
+            elif 'type=w' in lazy_src:
+                lazy_src = re.sub(r'type=w\d+', 'type=w966', lazy_src)
+            img['src'] = lazy_src
 
     # 6. CSS 추출 및 통합
     # 모든 <link rel="stylesheet"> 태그와 <style> 태그 찾기
@@ -94,9 +96,27 @@ def crawl_and_save_blog_post(blog_id: str, post_num: str) -> str:
     except FileNotFoundError:
         base_css = ""
 
+    # 이미지 간격을 위한 기본 스타일 추가
+    image_spacing_css = """
+    /* 네이버 블로그 이미지 간격 보존 */
+    .se-component.se-image {
+        margin: 0 0 5px 0 !important;
+    }
+    .se-section-image {
+        margin: 0 0 5px 0 !important;
+    }
+    .se-module-image {
+        margin: 0 0 5px 0 !important;
+    }
+    /* 이미지 컨테이너 간격 */
+    .se-component-content {
+        margin: 0 0 5px 0 !important;
+    }
+    """
+
     # 8. 통합된 CSS를 새로운 <style> 태그로 만들어 <head>에 추가
     # 기본 스타일을 먼저 추가하고, 그 다음에 페이지의 CSS 추가
-    final_css = base_css + "\n" + combined_css if base_css else combined_css
+    final_css = image_spacing_css + "\n" + base_css + "\n" + combined_css if base_css else image_spacing_css + "\n" + combined_css
     
     if final_css:
         new_style_tag = soup.new_tag('style')
